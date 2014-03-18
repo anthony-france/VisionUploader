@@ -11,14 +11,24 @@ namespace VisionUploader
 {
     public class UploadFile : INotifyPropertyChanged
     {
-        public enum UploadStatus { Queued, Connecting, Uploading, Completed, Failed, Canceled}
+        public enum UploadStatus { Queued, Compressing, Connecting, Uploading, Completed, Failed, Canceled}
 
-        public string name;
-        public UploadStatus status;
-        public ulong size;
-        public int progress;
+        private string name;
+        private UploadStatus status;
+        private ulong size;
+        private int progress;
+        private List<string> compressList;
 
         public UploadFile() { }
+
+        public UploadFile(List<string> fileList)
+        {
+            CompressList = fileList;
+            Size = 0;
+            Progress = 0;
+            Status = UploadStatus.Queued;
+            Name = fileList[0];
+        }
 
         public UploadFile(string name)
         {
@@ -89,6 +99,12 @@ namespace VisionUploader
                     NotifyPropertyChanged();
                 }
             }
+        }
+
+        public List<string> CompressList
+        {
+            get;
+            set;
         }
     }
 

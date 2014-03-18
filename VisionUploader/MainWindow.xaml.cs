@@ -17,6 +17,7 @@ using System.Windows.Shapes;
 using System.ComponentModel;
 using System.Collections.ObjectModel;
 using Ionic.Zip;
+using VisionUploader.Classes;
 
 
 namespace VisionUploader
@@ -39,9 +40,9 @@ namespace VisionUploader
         public MainWindow()
         {
             InitializeComponent();
-
+            
             username = Properties.Settings.Default.username.ToString();
-            password = Properties.Settings.Default.password.ToString();
+            password = CredentialsHelper.ToInsecureString(CredentialsHelper.DecryptString(Properties.Settings.Default.password.ToString()));
 
             lvFileList.ItemsSource = FileList;
 
@@ -77,14 +78,64 @@ namespace VisionUploader
 
         private void worker_DoWork(object sender, DoWorkEventArgs e)
         {
+
+            var file = FileList[currentIndex];
+
+            if (file.CompressList != null && file.CompressList.Count > 0)
+            {
+                worker.ReportProgress(0, UploadFile.UploadStatus.Compressing);
+
+                using (ZipFile zip = new ZipFile())
+                {
+
+                    foreach (var c in file.CompressList)
+                    {
+                        if (File.Exists(c))
+                        {
+                            zip.AddFile(c);
+                        }
+                        else if (Directory.Exists(c))
+                        {
+                            zip.AddDirectory(c);
+                        }
+                        else { }
+                    }
+
+                    zip.SaveProgress += (s, ev) =>
+                    {
+                        if (ev.EventType == ZipProgressEventType.Saving_BeforeWriteEntry)
+                        {
+                            decimal progress;
+                            if (ev.EntriesTotal > 0)
+                            {
+                                progress = ((decimal)ev.EntriesSaved / (decimal)ev.EntriesTotal) * 100;
+                            }
+                            else
+                            {
+                                progress = 0;
+                            }
+                            worker.ReportProgress((int)progress, UploadFile.UploadStatus.Compressing);
+                        }
+                    };
+
+                    FileList[currentIndex].Name = System.IO.Path.GetTempPath() + Guid.NewGuid().ToString() + ".zip";
+                    zip.Save(FileList[currentIndex].Name);
+                }
+                FileList[currentIndex].CompressList.Clear();
+                FileInfo info = new FileInfo(file.Name);
+                FileList[currentIndex].Size = (ulong)info.Length;
+                worker.ReportProgress(0, UploadFile.UploadStatus.Queued);
+            }
+
             using (var client = new SftpClient(server, 22, username, password))
             {
+                
+                worker.ReportProgress(0, UploadFile.UploadStatus.Connecting);
                 client.Connect();
-                var file = FileList[currentIndex];
+                client.BufferSize = 4 * 1024;                
+
                 using (var fs = new FileStream(file.Name, FileMode.Open))
-                {
-                    client.BufferSize = 4 * 1024;
-                    worker.ReportProgress(0, UploadFile.UploadStatus.Connecting);
+                { 
                     client.UploadFile(fs, System.IO.Path.GetFileName(file.Name), false, (bytesUploaded) =>
                     {
                         decimal progress = ((decimal)bytesUploaded / (decimal)file.Size) * 100;
@@ -123,7 +174,6 @@ namespace VisionUploader
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
-                MessageBoxResult result;
 
                 foreach (var file in files)
                 {
@@ -131,26 +181,20 @@ namespace VisionUploader
                     {
                         UploadFile f = new UploadFile(file);
                         FileList.Add(f);
+                        this.lvFileList.ScrollIntoView(f);
                     }
                     else if (Directory.Exists(file))
                     {
-                        using (ZipFile zip = new ZipFile())
-                        {
-                            result = MessageBox.Show("You must compress the folder before upload.  Continue?", "Confirmation", MessageBoxButton.YesNo, MessageBoxImage.Question);
-                            if (result == MessageBoxResult.Yes)
-                            {
-                                zip.AddDirectory(file);
-                                string zipFileName = System.IO.Path.GetTempPath() + Guid.NewGuid().ToString() + ".zip";
-                                zip.Save(zipFileName);
-                                FileList.Add(new UploadFile(zipFileName));
-                            }
-                        }
+                        var f = new UploadFile(new List<string>() { file });
+                        FileList.Add(f);
+                        this.lvFileList.ScrollIntoView(f);
                     }
                     else
                     {
 
                     }
                 }
+                
             }
         }
 
