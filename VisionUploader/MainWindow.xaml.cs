@@ -31,9 +31,17 @@ namespace VisionUploader
         public int currentIndex = -1;
         private readonly BackgroundWorker worker = new BackgroundWorker();
 
+        private string username;
+        private string password;
+
+        private string server = "upload.visionps.com";
+
         public MainWindow()
         {
             InitializeComponent();
+
+            username = Properties.Settings.Default.username.ToString();
+            password = Properties.Settings.Default.password.ToString();
 
             lvFileList.ItemsSource = FileList;
 
@@ -69,7 +77,7 @@ namespace VisionUploader
 
         private void worker_DoWork(object sender, DoWorkEventArgs e)
         {
-            using (var client = new SftpClient("upload.visionps.com", 22, "uploaddemo", "uploaddemo2014"))
+            using (var client = new SftpClient(server, 22, username, password))
             {
                 client.Connect();
                 var file = FileList[currentIndex];
@@ -87,8 +95,7 @@ namespace VisionUploader
             }
         }
 
-        private void worker_RunWorkerCompleted(object sender,
-                                               RunWorkerCompletedEventArgs e)
+        private void worker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
 
             if ((e.Cancelled == true))
@@ -146,5 +153,12 @@ namespace VisionUploader
                 }
             }
         }
+
+        private void menuAccount_Click(object sender, RoutedEventArgs e)
+        {
+            AccountWindow w = new AccountWindow();
+            w.Show();
+        }
+
     }
 }
