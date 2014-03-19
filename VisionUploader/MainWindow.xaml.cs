@@ -123,7 +123,8 @@ namespace VisionUploader
 
              if (worker.CancellationPending == false)
              {
-                using (var client = new SftpClient(server, port, Properties.Settings.Default.username.ToString(), CredentialsHelper.ToInsecureString(CredentialsHelper.DecryptString(Properties.Settings.Default.password.ToString()))))
+                string password = CredentialsHelper.ToInsecureString(CredentialsHelper.DecryptString(Properties.Settings.Default.password.ToString()));
+                using (var client = new SftpClient(server, port, Properties.Settings.Default.username.ToString(), password))
                 {
                     worker.ReportProgress(0, UploadFile.UploadStatus.Connecting);
                     client.Connect();

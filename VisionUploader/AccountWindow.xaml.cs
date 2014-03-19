@@ -24,21 +24,60 @@ namespace VisionUploader
         public AccountWindow()
         {
             InitializeComponent();
+            
+            txtServer.Text = Properties.Settings.Default.server;
+            txtPort.Text = Properties.Settings.Default.port;
+            txtUsername.Text = Properties.Settings.Default.username;
+            txtPassword.Password = CredentialsHelper.ToInsecureString(CredentialsHelper.DecryptString(Properties.Settings.Default.password));
+            txtKeyFile.Text = Properties.Settings.Default.public_key_file;
 
-            string username = Properties.Settings.Default.username.ToString();
-            string password = Properties.Settings.Default.password.ToString();
-
-            txtUsername.Text = username;
-            txtPassword.Password = CredentialsHelper.ToInsecureString( CredentialsHelper.DecryptString(password) );
-
+            txtServer.IsEnabled = Properties.Settings.Default.edit_server_field;
+            txtPort.IsEnabled = Properties.Settings.Default.edit_port_field;
+            txtUsername.IsEnabled = Properties.Settings.Default.edit_username_field;
+            txtPassword.IsEnabled = Properties.Settings.Default.edit_password_field;
+            txtKeyFile.IsEnabled = Properties.Settings.Default.edit_publickeyfile_field;
+            btnLocateKeyFile.IsEnabled = Properties.Settings.Default.edit_publickeyfile_field;
         }
         
         private void btnSave_Click(object sender, RoutedEventArgs e)
         {
-            Properties.Settings.Default.username = txtUsername.Text;
-            Properties.Settings.Default.password = CredentialsHelper.EncryptString(CredentialsHelper.ToSecureString(txtPassword.Password));
+            if (Properties.Settings.Default.edit_server_field)
+            {
+                Properties.Settings.Default.server = txtServer.Text;
+            }
+
+            if (Properties.Settings.Default.edit_port_field)
+            {
+                Properties.Settings.Default.port = txtPort.Text;
+            }
+
+            if (Properties.Settings.Default.edit_username_field)
+            {
+                Properties.Settings.Default.username = txtUsername.Text;
+            }
+
+            if (Properties.Settings.Default.edit_password_field)
+            {
+                Properties.Settings.Default.password = CredentialsHelper.EncryptString(CredentialsHelper.ToSecureString(txtPassword.Password));
+            }
+
+            if (Properties.Settings.Default.edit_publickeyfile_field)
+            {
+                Properties.Settings.Default.public_key_file = txtKeyFile.Text;
+            }
+
             Properties.Settings.Default.Save();
             Close();
+        }
+
+        private void btnLocateKeyFile_Click(object sender, RoutedEventArgs e)
+        {
+                var dialog = new System.Windows.Forms.OpenFileDialog();
+                System.Windows.Forms.DialogResult result = dialog.ShowDialog();
+                if (result == System.Windows.Forms.DialogResult.OK)
+                {
+                    txtKeyFile.Text = dialog.FileName;
+                }
         }
     }
 }
