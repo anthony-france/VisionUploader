@@ -18,6 +18,7 @@ using System.ComponentModel;
 using System.Collections.ObjectModel;
 using Ionic.Zip;
 using VisionUploader.Classes;
+using Renci.SshNet.Sftp;
 
 
 namespace VisionUploader
@@ -27,23 +28,18 @@ namespace VisionUploader
     /// </summary>
     public partial class MainWindow : Window
     {
-
         public ObservableCollection<UploadFile> FileList = new ObservableCollection<UploadFile>();
         public int currentIndex = -1;
+
         private readonly BackgroundWorker worker = new BackgroundWorker();
 
-        private string username;
-        private string password;
-
         private string server = "upload.visionps.com";
+        private int port = 22;
 
         public MainWindow()
         {
             InitializeComponent();
             
-            username = Properties.Settings.Default.username.ToString();
-            password = CredentialsHelper.ToInsecureString(CredentialsHelper.DecryptString(Properties.Settings.Default.password.ToString()));
-
             lvFileList.ItemsSource = FileList;
 
             worker.WorkerReportsProgress = true;
@@ -78,7 +74,6 @@ namespace VisionUploader
 
         private void worker_DoWork(object sender, DoWorkEventArgs e)
         {
-
             var file = FileList[currentIndex];
 
             if (file.CompressList != null && file.CompressList.Count > 0)
@@ -118,55 +113,52 @@ namespace VisionUploader
                         }
                     };
 
-                    FileList[currentIndex].Name = System.IO.Path.GetTempPath() + Guid.NewGuid().ToString() + ".zip";
-                    zip.Save(FileList[currentIndex].Name);
+                    FileList[currentIndex].FullName = System.IO.Path.GetTempPath() + Guid.NewGuid().ToString() + ".zip";
+                    zip.Save(FileList[currentIndex].FullName);
                 }
                 FileList[currentIndex].CompressList.Clear();
-                FileInfo info = new FileInfo(file.Name);
+                FileInfo info = new FileInfo(file.FullName);
                 FileList[currentIndex].Size = (ulong)info.Length;
-                worker.ReportProgress(0, UploadFile.UploadStatus.Queued);
-            }
+             }
 
-            using (var client = new SftpClient(server, 22, username, password))
-            {
-                
-                worker.ReportProgress(0, UploadFile.UploadStatus.Connecting);
-                client.Connect();
-                client.BufferSize = 4 * 1024;                
+             if (worker.CancellationPending == false)
+             {
+                using (var client = new SftpClient(server, port, Properties.Settings.Default.username.ToString(), CredentialsHelper.ToInsecureString(CredentialsHelper.DecryptString(Properties.Settings.Default.password.ToString()))))
+                {
+                    worker.ReportProgress(0, UploadFile.UploadStatus.Connecting);
+                    client.Connect();
+                    client.BufferSize = 4 * 1024;
 
-                using (var fs = new FileStream(file.Name, FileMode.Open))
-                { 
-                    client.UploadFile(fs, System.IO.Path.GetFileName(file.Name), false, (bytesUploaded) =>
+                    using (var fs = new FileStream(file.FullName, FileMode.Open))
                     {
-                        decimal progress = ((decimal)bytesUploaded / (decimal)file.Size) * 100;
-                        worker.ReportProgress((int)progress, UploadFile.UploadStatus.Uploading);
-                    });
+                        client.UploadFile(fs, System.IO.Path.GetFileName(file.FullName), true, (bytesUploaded) =>
+                        {
+                            decimal progress = ((decimal)bytesUploaded / (decimal)file.Size) * 100;
+                            worker.ReportProgress((int)progress, UploadFile.UploadStatus.Uploading);
+                        });
+                    }
+                    client.Disconnect();
                 }
-                client.Disconnect();
             }
         }
 
         private void worker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
-
             if ((e.Cancelled == true))
             {
                 FileList[currentIndex].Status = UploadFile.UploadStatus.Canceled;
                 FileList[currentIndex].Progress = 0;
             }
-
             else if (!(e.Error == null))
             {
                 FileList[currentIndex].Status = UploadFile.UploadStatus.Failed;
                 FileList[currentIndex].Progress = 0;
             }
-
             else
             {
                 FileList[currentIndex].Status = UploadFile.UploadStatus.Completed;
                 FileList[currentIndex].Progress = 100;
             }
-
         }
 
         public void Grid_Drop(object sender, DragEventArgs e)
@@ -191,10 +183,9 @@ namespace VisionUploader
                     }
                     else
                     {
-
+                        throw new NotImplementedException();
                     }
                 }
-                
             }
         }
 
@@ -203,6 +194,24 @@ namespace VisionUploader
             AccountWindow w = new AccountWindow();
             w.Show();
         }
+        
+        private void mnuCancel_Click(object sender, RoutedEventArgs e)
+        {
+            UploadFile selected_lvi = this.lvFileList.SelectedItem as UploadFile;
+            if (selected_lvi != null)
+            {
+                FileList[FileList.IndexOf(selected_lvi)].Status = UploadFile.UploadStatus.Canceled;
+                worker.CancelAsync();
+            }
+        }
 
+        private void mnuRestart_Click(object sender, RoutedEventArgs e)
+        {
+            UploadFile selected_lvi = this.lvFileList.SelectedItem as UploadFile;
+            if (selected_lvi != null)
+            {
+                FileList[FileList.IndexOf(selected_lvi)].Status = UploadFile.UploadStatus.Queued;
+            }
+        }
     }
 }

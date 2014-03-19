@@ -13,7 +13,8 @@ namespace VisionUploader
     {
         public enum UploadStatus { Queued, Compressing, Connecting, Uploading, Completed, Failed, Canceled}
 
-        private string name;
+        private string fullName;
+        private string fileName;
         private UploadStatus status;
         private ulong size;
         private int progress;
@@ -23,19 +24,25 @@ namespace VisionUploader
 
         public UploadFile(List<string> fileList)
         {
-            CompressList = fileList;
+            
+            FileInfo fi = new FileInfo(fileList[0]);
+
+            FullName = fi.FullName;
+            FileName = fi.Name;
             Size = 0;
             Progress = 0;
             Status = UploadStatus.Queued;
-            Name = fileList[0];
+            CompressList = fileList;
+
         }
 
         public UploadFile(string name)
         {
             FileInfo fi = new FileInfo(name);
-            Name = Path.GetFullPath(name);
+                        
+            FullName = fi.FullName;
+            FileName = fi.Name;
             Size = (ulong)fi.Length;
-
             Progress = 0;
             Status = UploadStatus.Queued;
         }
@@ -53,13 +60,26 @@ namespace VisionUploader
             }
         }
 
-        public string Name { 
-            get { return this.name; }
+        public string FullName 
+        { 
+            get { return this.fullName; }
             set 
             {
-                if (value != this.name)
+                if (value != this.fullName)
                 {
-                    this.name = value;
+                    this.fullName = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+        public string FileName
+        {
+            get { return this.fileName; }
+            set
+            {
+                if (value != this.fileName)
+                {
+                    this.fileName = value;
                     NotifyPropertyChanged();
                 }
             }
